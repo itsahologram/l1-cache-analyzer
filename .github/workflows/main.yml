@@ -14,16 +14,8 @@ jobs:
 
       - name: Show hardware
         run: |
-          echo "=== CPU ==="
-          lscpu
-
-          echo
-          echo "=== Cache ==="
-          lscpu | grep -i cache || true
-
-          echo
-          echo "=== CPU info ==="
-          grep -m 1 "model name" /proc/cpuinfo
+          echo "=== L1 Data Cache ==="
+              getconf -a | grep -i LEVEL1_DCACHE
 
       - name: Build
         run: |
@@ -32,7 +24,7 @@ jobs:
 
       - name: Run cache analyzer
         run: |
-          for i in {1..10}; do
+          for i in {1..36}; do
             echo
             echo "========== Run $i =========="
             ./build/cache_analyzer
