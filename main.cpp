@@ -49,17 +49,13 @@ namespace {
 
     std::size_t find_jump(const std::vector<double> &values,
                           const double min_ratio = 1.05) {
-        std::size_t jump = 0;
-        double max_ratio = 0.0;
-
         for (std::size_t i = 1; i < values.size(); ++i) {
-            if (const double ratio = values[i] / values[i - 1]; ratio > max_ratio) {
-                max_ratio = ratio;
-                jump = i;
+            if (const double ratio = values[i] / values[i - 1]; ratio >= min_ratio) {
+                return i;
             }
         }
 
-        return max_ratio >= min_ratio ? jump : 0;
+        return 0;
     }
 
     void build_chain(const std::vector<char *> &addresses) {
