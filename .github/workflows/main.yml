@@ -1,0 +1,39 @@
+name: Cache Analyzer Test
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show hardware
+        run: |
+          echo "=== CPU ==="
+          lscpu
+
+          echo
+          echo "=== Cache ==="
+          lscpu | grep -i cache || true
+
+          echo
+          echo "=== CPU info ==="
+          grep -m 1 "model name" /proc/cpuinfo
+
+      - name: Build
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+
+      - name: Run cache analyzer
+        run: |
+          for i in {1..10}; do
+            echo
+            echo "========== Run $i =========="
+            ./build/cache_analyzer
+          done
