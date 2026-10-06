@@ -6,7 +6,12 @@
 #include <new>
 #include <numeric>
 #include <random>
+#include <thread>
 #include <vector>
+#ifdef __linux__
+#include <sched.h>
+#include <stdexcept>
+#endif
 
 constexpr std::size_t BUFFER_SIZE = 2 * 1024 * 1024;
 
@@ -22,14 +27,28 @@ const std::size_t COUNTS[] = {2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 16, 32};
 constexpr std::size_t SET_STRIDE = 4096;
 
 
-constexpr std::size_t ITERATIONS = 10'000'000;
+constexpr std::size_t ITERATIONS = 100'000;
+constexpr std::size_t MEASURE_ROUNDS = 10;
+constexpr std::size_t WARMUP_ITERATIONS = 100'000;
 
 static std::mt19937 rng(692026);
 static char *volatile sink;
 
 namespace {
+#ifdef __linux__
+    void pin_to_cpu(const int cpu) {
+        cpu_set_t cpu_set;
+        CPU_ZERO(&cpu_set);
+        CPU_SET(cpu, &cpu_set);
+
+        if (sched_setaffinity(0, sizeof(cpu_set_t), &cpu_set) != 0) {
+            throw std::runtime_error("Failed to pin CPU");
+        }
+    }
+#endif
+
     std::size_t find_jump(const std::vector<double> &values,
-                          const double min_ratio = 1.1) {
+                          const double min_ratio = 1.05) {
         std::size_t jump = 0;
         double max_ratio = 0.0;
 
@@ -50,13 +69,7 @@ namespace {
         }
     }
 
-    double measure_chain(char **ptr) {
-        char **ptr_warm = ptr;
-        for (std::size_t i = 0; i < ITERATIONS / 100; ++i) {
-            ptr_warm = reinterpret_cast<char **>(*ptr_warm);
-        }
-        sink = reinterpret_cast<char *>(ptr_warm);
-
+    double measure_chain_once(char **ptr) {
         const auto start_time = std::chrono::steady_clock::now();
 
         for (std::size_t i = 0; i < ITERATIONS; ++i) {
@@ -66,8 +79,28 @@ namespace {
         sink = reinterpret_cast<char *>(ptr);
 
         const auto end_time = std::chrono::steady_clock::now();
+
         return std::chrono::duration<double, std::nano>(end_time - start_time).count() /
                ITERATIONS;
+    }
+
+    double measure_chain(char **ptr) {
+        char **ptr_warm = ptr;
+        for (std::size_t i = 0; i < WARMUP_ITERATIONS; ++i) {
+            ptr_warm = reinterpret_cast<char **>(*ptr_warm);
+        }
+        sink = reinterpret_cast<char *>(ptr_warm);
+
+        std::vector<double> measurements;
+        measurements.reserve(MEASURE_ROUNDS);
+
+        for (std::size_t i = 0; i < MEASURE_ROUNDS; ++i) {
+            measurements.push_back(measure_chain_once(ptr));
+        }
+
+        std::ranges::sort(measurements);
+
+        return measurements[0];
     }
 
 
@@ -94,7 +127,7 @@ namespace {
 static std::size_t detect_line() {
     char *buffer = allocate_buffer();
 
-    std::vector<std::size_t> blocks(BUFFER_SIZE / BLOCK_SIZE);
+    std::vector<std::size_t> blocks(2048);
     std::iota(blocks.begin(), blocks.end(), 0);
     std::ranges::shuffle(blocks, rng);
     std::vector<double> times;
@@ -233,7 +266,19 @@ static std::size_t detect_associativity() {
 }
 
 int main() {
-    const auto cache_line_size = detect_line();
+#ifdef __linux__
+    pin_to_cpu(static_cast<int>(std::thread::hardware_concurrency()) - 1);
+#endif
+
+    auto cache_line_size = detect_line();
+
+    while (cache_line_size == 0) {
+#ifdef DEBUG
+        std::cout << "Cache line not found\n";
+#endif
+        cache_line_size = detect_line();
+    }
+
     const auto capacity = detect_capacity(cache_line_size);
     const auto ways = detect_associativity();
 
