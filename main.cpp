@@ -48,7 +48,7 @@ namespace {
 #endif
 
     std::size_t find_jump(const std::vector<double> &values,
-                          const double min_ratio = 1.05) {
+                          const double min_ratio = 1.1) {
         for (std::size_t i = 1; i < values.size(); ++i) {
             if (const double ratio = values[i] / values[i - 1]; ratio >= min_ratio) {
                 return i;
