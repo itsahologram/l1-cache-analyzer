@@ -47,6 +47,7 @@ namespace {
     }
 #endif
 
+    // Ищем первый скачок времени.
     std::size_t find_jump(const std::vector<double> &values,
                           const double min_ratio = 1.1) {
         for (std::size_t i = 1; i < values.size(); ++i) {
@@ -118,7 +119,6 @@ namespace {
  * дешёвым
  * 2) d >= cache_line_size => Q в другой линии и среднее время обращения увеличивается.
  *
- * Ищем самый большой скачок времени.
  */
 static std::size_t detect_line() {
     char *buffer = allocate_buffer();
@@ -172,7 +172,6 @@ static std::size_t detect_line() {
  * 1) size <= cache_size => данные помещаются в L1, обращения остаются быстрыми.
  * 2) size > cache_size => данные перестают помещаться в L1, время доступа увеличивается.
  *
- * Ищем самый большой скачок времени.
  */
 static std::size_t detect_capacity(const std::size_t cache_line_size) {
     char *buffer = allocate_buffer();
@@ -222,7 +221,6 @@ static std::size_t detect_capacity(const std::size_t cache_line_size) {
  * 1) count <= associativity => все линии помещаются в набор, обращения остаются быстрыми.
  * 2) count > associativity => линии вытесняют друг друга, время доступа увеличивается.
  *
- * Ищем самый большой скачок времени
  */
 static std::size_t detect_associativity() {
     char *buffer = allocate_buffer();
